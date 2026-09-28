@@ -1,4 +1,4 @@
-import type { Express, Request, Response, NextFunction } from "express";
+import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import { type Server } from "http";
 import sharp from "sharp";
 import { storage } from "./storage";
@@ -7,6 +7,18 @@ import { promises as fs, existsSync } from "fs";
 import path from "path";
 import os from "os";
 import crypto from "crypto";
+import { PDFDocument, rgb } from "pdf-lib";
+import fontkit from "@pdf-lib/fontkit";
+import {
+  safeFetchText,
+  SafeFetchError,
+  loginLimiter,
+  generateLimiter,
+  fetchUrlLimiter,
+  createJobLimiter,
+  JobQueueFullError,
+  attachment,
+} from "./security";
 
 function findFfmpeg(): string | null {
   const candidates = [
@@ -32,6 +44,20 @@ if (!FFMPEG) {
   console.warn("[warn] ffmpeg not found — audio/video generation will return errors");
 }
 
+// At most 2 ffmpeg processes at once, up to 8 more requests wait in line; the rest get 503.
+const runFfmpegJob = createJobLimiter(2, 8);
+
+function runFfmpeg(args: string[], timeout: number): Promise<void> {
+  return runFfmpegJob(
+    () =>
+      new Promise<void>((resolve, reject) => {
+        execFile(FFMPEG!, args, { timeout }, (err) => {
+          if (err) reject(err); else resolve();
+        });
+      }),
+  );
+}
+
 function requireAdmin(req: Request, res: Response, next: NextFunction) {
   if (!req.session.userId) {
     return res.status(401).json({ message: "Требуется авторизация" });
@@ -44,7 +70,9 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
 
-  app.post("/api/admin/login", async (req, res) => {
+  app.use("/api/generate", generateLimiter);
+
+  app.post("/api/admin/login", loginLimiter, async (req, res) => {
     const { username, password } = req.body;
     if (!username || !password) {
       return res.status(400).json({ message: "Укажите логин и пароль" });
@@ -53,8 +81,12 @@ export async function registerRoutes(
     if (!user) {
       return res.status(401).json({ message: "Неверный логин или пароль" });
     }
-    req.session.userId = user.id;
-    res.json({ ok: true, username: user.username });
+    // New session id on login to prevent session fixation
+    req.session.regenerate((err) => {
+      if (err) return res.status(500).json({ message: "Не удалось создать сессию" });
+      req.session.userId = user.id;
+      res.json({ ok: true, username: user.username });
+    });
   });
 
   app.post("/api/admin/logout", (req, res) => {
@@ -90,7 +122,7 @@ export async function registerRoutes(
     res.json(article);
   });
 
-  app.post("/api/fetch-url", async (req, res) => {
+  app.post("/api/fetch-url", fetchUrlLimiter, async (req, res) => {
     const { url } = req.body;
     if (!url || typeof url !== "string") {
       return res.status(400).json({ message: "Укажите URL" });
@@ -103,27 +135,13 @@ export async function registerRoutes(
     }
 
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000);
-      const response = await fetch(url, {
-        signal: controller.signal,
-        headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; QAHelper/1.0)",
-          "Accept": "text/html,application/xhtml+xml,*/*",
-        },
-      });
-      clearTimeout(timeout);
-
-      if (!response.ok) {
-        return res.status(400).json({ message: `Сервер ответил с кодом ${response.status}` });
+      const { status, text } = await safeFetchText(url);
+      if (status < 200 || status >= 300) {
+        return res.status(400).json({ message: `Сервер ответил с кодом ${status}` });
       }
-
-      const html = await response.text();
-      res.json({ html });
+      res.json({ html: text });
     } catch (e: any) {
-      const msg = e.name === "AbortError"
-        ? "Превышено время ожидания (15 сек)"
-        : `Ошибка загрузки: ${e.message}`;
+      const msg = e instanceof SafeFetchError ? e.message : `Ошибка загрузки: ${e.message}`;
       res.status(400).json({ message: msg });
     }
   });
@@ -302,26 +320,26 @@ export async function registerRoutes(
 
     if (type === "txt") {
       res.set("Content-Type", "text/plain; charset=utf-8");
-      res.set("Content-Disposition", `attachment; filename="${name}.txt"`);
+      res.set("Content-Disposition", attachment(`${name}.txt`));
       res.send(content);
     } else if (type === "csv") {
       const csvContent = "id,name,value\n1,test_item_1,100\n2,test_item_2,200\n3,test_item_3,300\n" + content.split("\n").map((line, i) => `${i + 4},"${line}",${Math.floor(Math.random() * 1000)}`).join("\n");
       res.set("Content-Type", "text/csv; charset=utf-8");
-      res.set("Content-Disposition", `attachment; filename="${name}.csv"`);
+      res.set("Content-Disposition", attachment(`${name}.csv`));
       res.send(csvContent);
     } else if (type === "pdf") {
-      const pdfContent = generateSimplePDF(content, name);
+      const pdfContent = await generateSimplePDF(content, name);
       res.set("Content-Type", "application/pdf");
-      res.set("Content-Disposition", `attachment; filename="${name}.pdf"`);
+      res.set("Content-Disposition", attachment(`${name}.pdf`));
       res.send(pdfContent);
     } else if (type === "docx") {
       const docxContent = await generateSimpleDOCX(content);
       res.set("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-      res.set("Content-Disposition", `attachment; filename="${name}.docx"`);
+      res.set("Content-Disposition", attachment(`${name}.docx`));
       res.send(docxContent);
     } else {
       res.set("Content-Type", "application/octet-stream");
-      res.set("Content-Disposition", `attachment; filename="${name}.${type}"`);
+      res.set("Content-Disposition", attachment(`${name}.${type.replace(/[^a-z0-9]/gi, "")}`));
       res.send(content);
     }
   });
@@ -421,11 +439,7 @@ export async function registerRoutes(
 
       ffmpegArgs.push(tmpFile);
 
-      await new Promise<void>((resolve, reject) => {
-        execFile(FFMPEG, ffmpegArgs, { timeout: 30000 }, (err) => {
-          if (err) reject(err); else resolve();
-        });
-      });
+      await runFfmpeg(ffmpegArgs, 30000);
 
       let fileData = await fs.readFile(tmpFile);
 
@@ -456,6 +470,7 @@ export async function registerRoutes(
       res.set("Content-Disposition", `attachment; filename="test_audio_${duration}s.${outputFormat}"`);
       res.send(fileData);
     } catch (e: any) {
+      if (e instanceof JobQueueFullError) return res.status(503).json({ message: e.message });
       res.status(500).json({ message: `Ошибка генерации аудио: ${e.message}` });
     } finally {
       fs.unlink(tmpFile).catch(() => {});
@@ -506,11 +521,7 @@ export async function registerRoutes(
 
       ffmpegArgs.push(tmpFile);
 
-      await new Promise<void>((resolve, reject) => {
-        execFile(FFMPEG, ffmpegArgs, { timeout: 60000 }, (err) => {
-          if (err) reject(err); else resolve();
-        });
-      });
+      await runFfmpeg(ffmpegArgs, 60000);
 
       let fileData = await fs.readFile(tmpFile);
 
@@ -539,18 +550,59 @@ export async function registerRoutes(
       res.set("Content-Disposition", `attachment; filename="test_video_${duration}s_${width}x${height}.${format}"`);
       res.send(fileData);
     } catch (e: any) {
+      if (e instanceof JobQueueFullError) return res.status(503).json({ message: e.message });
       res.status(500).json({ message: `Ошибка генерации видео: ${e.message}` });
     } finally {
       fs.unlink(tmpFile).catch(() => {});
     }
   });
 
-  app.get("/api/mock", async (req, res) => {
-    const status = parseInt(req.query.status as string) || 200;
-    const delay = Math.min(30000, Math.max(0, parseInt(req.query.delay as string) || 0));
+  // Mock endpoint: any method. Query params:
+  //   status (100-599), delay (ms), body (raw response body), contentType,
+  //   headers (JSON object), errorRate (0-100, % chance of 500), drop=1 (close socket without response)
+  app.all("/api/mock", async (req, res) => {
+    const q = req.query as Record<string, string | undefined>;
+    const status = q.status === undefined || q.status === "" ? 200 : Number(q.status);
+    if (!Number.isInteger(status) || status < 100 || status > 599) {
+      return res.status(400).json({ message: "status должен быть целым числом от 100 до 599" });
+    }
+    const delay = Math.min(30000, Math.max(0, parseInt(q.delay ?? "") || 0));
+    const errorRate = Math.min(100, Math.max(0, parseFloat(q.errorRate ?? "") || 0));
+
+    let extraHeaders: Record<string, string> = {};
+    if (q.headers) {
+      try {
+        const parsed = JSON.parse(q.headers);
+        if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) throw new Error();
+        extraHeaders = Object.fromEntries(Object.entries(parsed).map(([k, v]) => [k, String(v)]));
+      } catch {
+        return res.status(400).json({ message: "headers должен быть JSON-объектом, например {\"X-Test\":\"1\"}" });
+      }
+    }
 
     if (delay > 0) {
       await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+
+    if (q.drop === "1" || q.drop === "true") {
+      req.socket.destroy();
+      return;
+    }
+
+    const failed = errorRate > 0 && Math.random() * 100 < errorRate;
+    const finalStatus = failed ? 500 : status;
+
+    try {
+      for (const [k, v] of Object.entries(extraHeaders)) res.set(k, v);
+    } catch {
+      return res.status(400).json({ message: "Недопустимое имя или значение заголовка" });
+    }
+    res.set("X-Mock-Method", req.method);
+
+    if (q.body !== undefined && !failed) {
+      res.status(finalStatus);
+      res.type(q.contentType || "application/json");
+      return res.send(q.body);
     }
 
     const bodies: Record<number, object> = {
@@ -563,69 +615,106 @@ export async function registerRoutes(
       500: { status: "error", message: "Internal Server Error", code: "INTERNAL_ERROR", trace: "Error at line 42" },
     };
 
-    const body = bodies[status] || { status: "unknown", code: status };
-    res.status(status).json(body);
+    const body = failed
+      ? { status: "error", message: "Random failure (errorRate)", code: "RANDOM_FAILURE" }
+      : bodies[finalStatus] || { status: finalStatus < 400 ? "ok" : "error", code: finalStatus };
+    if (finalStatus === 204 || finalStatus === 304) return res.status(finalStatus).end();
+    res.status(finalStatus).json(body);
+  });
+
+  // Echo: returns exactly what the server received
+  const echoText = express.text({
+    type: (req) => !/json|x-www-form-urlencoded/i.test(String(req.headers["content-type"] ?? "")),
+    limit: "1mb",
+  });
+  app.all(["/api/echo", "/api/echo/{*rest}"], echoText, (req, res) => {
+    const raw = (req as any).rawBody as Buffer | undefined;
+    const body =
+      raw instanceof Buffer ? raw.toString("utf8") : typeof req.body === "string" ? req.body : req.body ?? null;
+    res.json({
+      method: req.method,
+      path: req.path,
+      query: req.query,
+      headers: req.headers,
+      body: body === "" || (typeof body === "object" && body && Object.keys(body).length === 0) ? null : body,
+      ip: req.ip,
+      receivedAt: new Date().toISOString(),
+    });
   });
 
   return httpServer;
 }
 
-function generateSimplePDF(content: string, title: string): Buffer {
-  const lines = content.split("\n");
-  const textObjects = lines.map((line, i) => {
-    const y = 750 - i * 20;
-    return `BT /F1 12 Tf ${50} ${y} Td (${escPdfStr(line)}) Tj ET`;
-  }).join("\n");
+let pdfFontBytes: Promise<Buffer> | null = null;
 
-  const titleObj = `BT /F1 18 Tf 50 780 Td (${escPdfStr(title)}) Tj ET`;
-
-  const stream = `${titleObj}\n${textObjects}`;
-  const streamLen = Buffer.byteLength(stream);
-
-  const pdf = `%PDF-1.4
-1 0 obj
-<< /Type /Catalog /Pages 2 0 R >>
-endobj
-
-2 0 obj
-<< /Type /Pages /Kids [3 0 R] /Count 1 >>
-endobj
-
-3 0 obj
-<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
-endobj
-
-4 0 obj
-<< /Length ${streamLen} >>
-stream
-${stream}
-endstream
-endobj
-
-5 0 obj
-<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
-endobj
-
-xref
-0 6
-0000000000 65535 f 
-0000000009 00000 n 
-0000000058 00000 n 
-0000000115 00000 n 
-0000000266 00000 n 
-0000000${(streamLen + 320).toString().padStart(3, "0")} 00000 n 
-
-trailer
-<< /Size 6 /Root 1 0 R >>
-startxref
-0
-%%EOF`;
-
-  return Buffer.from(pdf);
+function loadPdfFont(): Promise<Buffer> {
+  if (!pdfFontBytes) {
+    const file = "assets/fonts/NotoSans-Regular.ttf";
+    const candidates = [
+      // production bundle: dist/index.cjs + dist/assets
+      typeof __dirname !== "undefined" ? path.join(__dirname, file) : "",
+      path.join(process.cwd(), "server", file),
+      path.join(process.cwd(), "dist", file),
+    ].filter(Boolean);
+    const found = candidates.find((c) => existsSync(c));
+    pdfFontBytes = found ? fs.readFile(found) : Promise.reject(new Error("PDF font not found"));
+  }
+  return pdfFontBytes;
 }
 
-function escPdfStr(str: string): string {
-  return str.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+async function generateSimplePDF(content: string, title: string): Promise<Buffer> {
+  const doc = await PDFDocument.create();
+  doc.registerFontkit(fontkit);
+  doc.setTitle(title);
+  doc.setProducer("QA Helper");
+  const font = await doc.embedFont(await loadPdfFont(), { subset: true });
+
+  const [pageW, pageH] = [595.28, 841.89]; // A4
+  const margin = 50;
+  const maxWidth = pageW - margin * 2;
+  const bodySize = 12;
+  const lineHeight = bodySize * 1.45;
+
+  // Word-wrap every source line to the printable width
+  const wrap = (line: string): string[] => {
+    if (line === "") return [""];
+    const out: string[] = [];
+    let current = "";
+    for (const word of line.split(/(\s+)/)) {
+      const candidate = current + word;
+      if (font.widthOfTextAtSize(candidate, bodySize) <= maxWidth) {
+        current = candidate;
+        continue;
+      }
+      if (current.trim()) out.push(current.trimEnd());
+      current = word.trimStart();
+      // a single word wider than the page: hard-split it
+      while (font.widthOfTextAtSize(current, bodySize) > maxWidth) {
+        let cut = current.length - 1;
+        while (cut > 1 && font.widthOfTextAtSize(current.slice(0, cut), bodySize) > maxWidth) cut--;
+        out.push(current.slice(0, cut));
+        current = current.slice(cut);
+      }
+    }
+    out.push(current);
+    return out;
+  };
+
+  let page = doc.addPage([pageW, pageH]);
+  let y = pageH - margin;
+  page.drawText(title, { x: margin, y: y - 18, size: 18, font, color: rgb(0.1, 0.1, 0.12) });
+  y -= 18 + 24;
+
+  for (const line of content.split(/\r?\n/).flatMap(wrap)) {
+    if (y - lineHeight < margin) {
+      page = doc.addPage([pageW, pageH]);
+      y = pageH - margin;
+    }
+    y -= lineHeight;
+    if (line) page.drawText(line, { x: margin, y, size: bodySize, font, color: rgb(0.15, 0.15, 0.18) });
+  }
+
+  return Buffer.from(await doc.save());
 }
 
 async function generateSimpleDOCX(content: string): Promise<Buffer> {

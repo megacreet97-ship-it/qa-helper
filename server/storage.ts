@@ -85,7 +85,12 @@ export class DatabaseStorage implements IStorage {
   async seedAdmin(): Promise<void> {
     const existing = await this.getUserByUsername("admin");
     if (!existing) {
-      await this.createUser({ username: "admin", password: "!55admin55!" });
+      const password = process.env.ADMIN_PASSWORD;
+      if (!password) {
+        console.warn("[warn] ADMIN_PASSWORD not set — admin user not created.");
+        return;
+      }
+      await this.createUser({ username: "admin", password });
       console.log("Admin user seeded.");
     }
   }
