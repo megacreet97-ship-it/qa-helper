@@ -65,7 +65,7 @@ export default function GuidesPage() {
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
         <BookOpen className="w-6 h-6 text-primary" />
-        <h1 className="text-2xl font-bold" data-testid="text-guides-heading">
+        <h1 className="text-2xl md:text-[1.75rem] font-semibold leading-tight" data-testid="text-guides-heading">
           Обучение и гайды
         </h1>
       </div>

@@ -5,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { ArrowLeftRight, Trash2, Copy, ArrowRightLeft } from "lucide-react";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 
 type DiffType = "equal" | "added" | "removed" | "changed";
 
@@ -216,8 +217,8 @@ function renderWhitespace(text: string): string {
 export default function TextComparePage() {
   const [leftText, setLeftText] = useState("");
   const [rightText, setRightText] = useState("");
-  const [ignoreWhitespace, setIgnoreWhitespace] = useState(false);
-  const [showWhitespace, setShowWhitespace] = useState(false);
+  const [ignoreWhitespace, setIgnoreWhitespace] = usePersistentState("text-compare.ignoreWhitespace", false);
+  const [showWhitespace, setShowWhitespace] = usePersistentState("text-compare.showWhitespace", false);
   const [showDiff, setShowDiff] = useState(false);
 
   const diffLines = useMemo(() => {
@@ -263,10 +264,10 @@ export default function TextComparePage() {
   return (
     <div className="space-y-6 max-w-7xl">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight" data-testid="text-compare-title">
+        <h1 className="text-2xl md:text-[1.75rem] font-semibold leading-tight" data-testid="text-compare-title">
           Сравнение текстов
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="text-[15px] text-muted-foreground mt-2 max-w-prose">
           Сравнение двух текстов с подсветкой различий, отступов и изменений
         </p>
       </div>

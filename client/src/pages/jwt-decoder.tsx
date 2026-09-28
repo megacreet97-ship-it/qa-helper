@@ -4,7 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { CopyButton } from "@/components/copy-button";
-import { KeyRound, AlertTriangle, CheckCircle, Clock } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { JwtGenerator } from "@/components/jwt-generator";
+import { useTabParam } from "@/hooks/use-tab-param";
+import { KeyRound, AlertTriangle, CheckCircle, Clock, ScanSearch, PenLine } from "lucide-react";
 
 interface DecodedJWT {
   header: Record<string, unknown>;
@@ -44,6 +47,7 @@ function formatTimestamp(ts: number): string {
 }
 
 export default function JwtDecoderPage() {
+  const [tab, setTab] = useTabParam("decode", ["decode", "create"]);
   const [token, setToken] = useState("");
   const [decoded, setDecoded] = useState<DecodedJWT | null>(null);
   const [error, setError] = useState("");
@@ -88,6 +92,13 @@ export default function JwtDecoderPage() {
     }
   };
 
+  const openInDecoder = (t: string) => {
+    setToken(t);
+    setDecoded(null);
+    setError("");
+    setTab("decode");
+  };
+
   const knownClaims: Record<string, string> = {
     iss: "Издатель (Issuer)",
     sub: "Субъект (Subject)",
@@ -117,14 +128,41 @@ export default function JwtDecoderPage() {
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight" data-testid="text-page-title">
+        <h1 className="text-2xl md:text-[1.75rem] font-semibold leading-tight" data-testid="text-page-title">
           JWT-декодер
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Расшифровка и анализ JSON Web Token (JWT)
+        <p className="text-[15px] text-muted-foreground mt-2 max-w-prose">
+          Расшифровка, анализ и создание JSON Web Token (JWT)
         </p>
       </div>
 
+      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
+        <TabsList className="flex flex-wrap h-auto gap-1" data-testid="tabs-jwt">
+          <TabsTrigger value="decode" className="gap-1" data-testid="tab-jwt-decode">
+            <ScanSearch className="w-3 h-3" /> Декодирование
+          </TabsTrigger>
+          <TabsTrigger value="create" className="gap-1" data-testid="tab-jwt-create">
+            <PenLine className="w-3 h-3" /> Создание
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="create">
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="space-y-1">
+                <h3 className="text-base font-semibold">Генератор JWT</h3>
+                <p className="text-xs text-muted-foreground">
+                  Токены с нужными claims, истёкшим exp или без подписи — для проверки авторизации
+                </p>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <JwtGenerator onOpenInDecoder={openInDecoder} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="decode">
       <Card>
         <CardHeader className="pb-3">
           <div className="space-y-1">
@@ -239,6 +277,8 @@ export default function JwtDecoderPage() {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

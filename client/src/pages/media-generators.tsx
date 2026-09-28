@@ -6,18 +6,19 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Download, Music, Video, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 
 export default function MediaGeneratorsPage() {
-  const [audioFormat, setAudioFormat] = useState("wav");
-  const [audioSizeStr, setAudioSizeStr] = useState("1");
-  const [audioDurationStr, setAudioDurationStr] = useState("5");
+  const [audioFormat, setAudioFormat] = usePersistentState("media-generators.audioFormat", "wav");
+  const [audioSizeStr, setAudioSizeStr] = usePersistentState("media-generators.audioSizeStr", "1");
+  const [audioDurationStr, setAudioDurationStr] = usePersistentState("media-generators.audioDurationStr", "5");
   const [audioLoading, setAudioLoading] = useState(false);
 
-  const [videoFormat, setVideoFormat] = useState("mp4");
-  const [videoSizeStr, setVideoSizeStr] = useState("1");
-  const [videoDurationStr, setVideoDurationStr] = useState("3");
-  const [videoWidth, setVideoWidth] = useState(640);
-  const [videoHeight, setVideoHeight] = useState(480);
+  const [videoFormat, setVideoFormat] = usePersistentState("media-generators.videoFormat", "mp4");
+  const [videoSizeStr, setVideoSizeStr] = usePersistentState("media-generators.videoSizeStr", "1");
+  const [videoDurationStr, setVideoDurationStr] = usePersistentState("media-generators.videoDurationStr", "3");
+  const [videoWidth, setVideoWidth] = usePersistentState("media-generators.videoWidth", 640);
+  const [videoHeight, setVideoHeight] = usePersistentState("media-generators.videoHeight", 480);
   const [videoLoading, setVideoLoading] = useState(false);
 
   const { toast } = useToast();
@@ -121,10 +122,10 @@ export default function MediaGeneratorsPage() {
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight" data-testid="text-page-title">
+        <h1 className="text-2xl md:text-[1.75rem] font-semibold leading-tight" data-testid="text-page-title">
           Аудио и видео
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="text-[15px] text-muted-foreground mt-2 max-w-prose">
           Генерация тестовых аудио- и видеофайлов разных форматов и размеров
         </p>
       </div>

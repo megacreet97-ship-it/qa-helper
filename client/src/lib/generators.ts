@@ -119,22 +119,28 @@ export function generateFIO(gender: "male" | "female" | "random", complexity: Fi
   return `${randomItem(femaleLastNames)} ${randomItem(femaleFirstNames)} ${randomItem(femalePatronymics)}`;
 }
 
-export function generateSNILS(valid: boolean): string {
-  if (!valid) {
-    const digits = Array.from({ length: 9 }, () => randomInt(0, 9));
-    const wrongChecksum = randomInt(0, 99);
-    const num = digits.join("");
-    const cs = wrongChecksum.toString().padStart(2, "0");
-    return `${num.slice(0, 3)}-${num.slice(3, 6)}-${num.slice(6, 9)} ${cs}`;
-  }
-
-  const digits = Array.from({ length: 9 }, () => randomInt(0, 9));
+function snilsChecksum(digits: number[]): number {
   let sum = 0;
   for (let i = 0; i < 9; i++) {
     sum += digits[i] * (9 - i);
   }
-  let checksum = sum % 101;
-  if (checksum === 100) checksum = 0;
+  const checksum = sum % 101;
+  return checksum === 100 ? 0 : checksum;
+}
+
+export function generateSNILS(valid: boolean): string {
+  // Numbers up to 001-001-998 are not checksummed, so start above that range
+  let digits: number[];
+  do {
+    digits = Array.from({ length: 9 }, () => randomInt(0, 9));
+  } while (Number(digits.join("")) <= 1001998);
+
+  const correct = snilsChecksum(digits);
+  let checksum = correct;
+  if (!valid) {
+    // guaranteed wrong: shift by 1..99 modulo 100
+    checksum = (correct + randomInt(1, 99)) % 100;
+  }
 
   const num = digits.join("");
   const cs = checksum.toString().padStart(2, "0");
