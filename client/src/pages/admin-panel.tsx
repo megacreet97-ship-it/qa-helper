@@ -200,7 +200,7 @@ export default function AdminPanelPage() {
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold" data-testid="text-admin-heading">
+          <h1 className="text-2xl md:text-[1.75rem] font-semibold leading-tight" data-testid="text-admin-heading">
             Админ-панель
           </h1>
           <p className="text-sm text-muted-foreground">

@@ -195,10 +195,10 @@ export default function JsonValidatorPage() {
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight" data-testid="text-page-title">
+        <h1 className="text-2xl md:text-[1.75rem] font-semibold leading-tight" data-testid="text-page-title">
           JSON Валидатор
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="text-[15px] text-muted-foreground mt-2 max-w-prose">
           Проверка синтаксиса JSON, форматирование, минификация и анализ структуры
         </p>
       </div>

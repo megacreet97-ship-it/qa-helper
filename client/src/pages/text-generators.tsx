@@ -14,18 +14,21 @@ import {
   type TextType,
 } from "@/lib/generators";
 import { Dices, AlignLeft, Globe, Code, ShieldAlert } from "lucide-react";
+import { usePersistentState } from "@/hooks/use-persistent-state";
+import { useTabParam } from "@/hooks/use-tab-param";
 
 export default function TextGeneratorsPage() {
+  const [tab, setTab] = useTabParam("text");
   const [textResult, setTextResult] = useState("");
-  const [textLengthStr, setTextLengthStr] = useState("100");
-  const [textType, setTextType] = useState<TextType>("meaningful_ru");
+  const [textLengthStr, setTextLengthStr] = usePersistentState("text-generators.textLengthStr", "100");
+  const [textType, setTextType] = usePersistentState<TextType>("text-generators.textType", "meaningful_ru");
 
   const [loremResult, setLoremResult] = useState("");
-  const [loremLang, setLoremLang] = useState<"ru" | "en">("en");
-  const [loremParagraphsStr, setLoremParagraphsStr] = useState("3");
+  const [loremLang, setLoremLang] = usePersistentState<"ru" | "en">("text-generators.loremLang", "en");
+  const [loremParagraphsStr, setLoremParagraphsStr] = usePersistentState("text-generators.loremParagraphsStr", "3");
 
   const [unicodeResult, setUnicodeResult] = useState("");
-  const [unicodeLengthStr, setUnicodeLengthStr] = useState("50");
+  const [unicodeLengthStr, setUnicodeLengthStr] = usePersistentState("text-generators.unicodeLengthStr", "50");
 
   const [sqlResults, setSqlResults] = useState<string[]>([]);
   const [xssResults, setXssResults] = useState<string[]>([]);
@@ -33,15 +36,15 @@ export default function TextGeneratorsPage() {
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight" data-testid="text-page-title">
+        <h1 className="text-2xl md:text-[1.75rem] font-semibold leading-tight" data-testid="text-page-title">
           Генераторы текста
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="text-[15px] text-muted-foreground mt-2 max-w-prose">
           Генерация текстового содержимого для тестирования полей ввода и валидации
         </p>
       </div>
 
-      <Tabs defaultValue="text" className="space-y-4">
+      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <TabsList className="flex flex-wrap h-auto gap-1" data-testid="tabs-text-gen">
           <TabsTrigger value="text" className="gap-1" data-testid="tab-text">
             <AlignLeft className="w-3 h-3" /> По длине

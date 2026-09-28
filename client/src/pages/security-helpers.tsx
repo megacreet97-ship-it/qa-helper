@@ -13,28 +13,31 @@ import {
   generateLongString,
 } from "@/lib/generators";
 import { ShieldAlert, Code, Route, CircleSlash, TextCursorInput, Dices } from "lucide-react";
+import { usePersistentState } from "@/hooks/use-persistent-state";
+import { useTabParam } from "@/hooks/use-tab-param";
 
 export default function SecurityHelpersPage() {
+  const [tab, setTab] = useTabParam("sql");
   const [sqlResults, setSqlResults] = useState<string[]>([]);
   const [xssResults, setXssResults] = useState<string[]>([]);
   const [pathResults, setPathResults] = useState<string[]>([]);
   const [nullResults, setNullResults] = useState<string[]>([]);
 
-  const [longStringLength, setLongStringLength] = useState(10000);
+  const [longStringLength, setLongStringLength] = usePersistentState("security-helpers.longStringLength", 10000);
   const [longStringResult, setLongStringResult] = useState("");
 
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight" data-testid="text-page-title">
+        <h1 className="text-2xl md:text-[1.75rem] font-semibold leading-tight" data-testid="text-page-title">
           Безопасность / Негативное тестирование
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="text-[15px] text-muted-foreground mt-2 max-w-prose">
           Пейлоады и тестовые векторы для проверки безопасности и негативного тестирования
         </p>
       </div>
 
-      <Tabs defaultValue="sql" className="space-y-4">
+      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <TabsList className="flex flex-wrap h-auto gap-1" data-testid="tabs-security">
           <TabsTrigger value="sql" className="gap-1" data-testid="tab-sec-sql">
             <Code className="w-3 h-3" /> SQL-инъекции

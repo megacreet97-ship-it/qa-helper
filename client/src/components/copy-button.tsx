@@ -7,9 +7,10 @@ interface CopyButtonProps {
   variant?: "ghost" | "outline" | "default" | "secondary";
   size?: "default" | "sm" | "icon";
   className?: string;
+  label?: string;
 }
 
-export function CopyButton({ text, variant = "ghost", size = "icon", className }: CopyButtonProps) {
+export function CopyButton({ text, variant = "ghost", size = "icon", className, label }: CopyButtonProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -35,9 +36,11 @@ export function CopyButton({ text, variant = "ghost", size = "icon", className }
       size={size}
       onClick={handleCopy}
       className={className}
+      aria-label={label ? `Копировать: ${label}` : "Копировать"}
       data-testid="button-copy"
     >
       {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+      {label}
     </Button>
   );
 }

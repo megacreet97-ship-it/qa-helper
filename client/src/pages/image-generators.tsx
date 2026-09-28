@@ -9,13 +9,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CopyButton } from "@/components/copy-button";
 import { Download, Image, ImageOff, Dices } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { usePersistentState } from "@/hooks/use-persistent-state";
+import { useTabParam } from "@/hooks/use-tab-param";
 
 export default function ImageGeneratorsPage() {
-  const [width, setWidth] = useState(400);
-  const [height, setHeight] = useState(300);
-  const [format, setFormat] = useState("svg");
-  const [transparent, setTransparent] = useState(false);
-  const [targetSizeMb, setTargetSizeMb] = useState(0);
+  const [tab, setTab] = useTabParam("placeholder");
+  const [width, setWidth] = usePersistentState("image-generators.width", 400);
+  const [height, setHeight] = usePersistentState("image-generators.height", 300);
+  const [format, setFormat] = usePersistentState("image-generators.format", "svg");
+  const [transparent, setTransparent] = usePersistentState("image-generators.transparent", false);
+  const [targetSizeMb, setTargetSizeMb] = usePersistentState("image-generators.targetSizeMb", 0);
   const [imageUrl, setImageUrl] = useState("");
   const [base64, setBase64] = useState("");
   const [loading, setLoading] = useState(false);
@@ -121,15 +124,15 @@ export default function ImageGeneratorsPage() {
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight" data-testid="text-page-title">
+        <h1 className="text-2xl md:text-[1.75rem] font-semibold leading-tight" data-testid="text-page-title">
           Генераторы изображений
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="text-[15px] text-muted-foreground mt-2 max-w-prose">
           Создание изображений-заглушек и битых файлов для тестирования загрузки
         </p>
       </div>
 
-      <Tabs defaultValue="placeholder" className="space-y-4">
+      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <TabsList data-testid="tabs-image-gen">
           <TabsTrigger value="placeholder" className="gap-1" data-testid="tab-placeholder">
             <Image className="w-3 h-3" /> Заглушка

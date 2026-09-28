@@ -512,10 +512,10 @@ export default function HtmlComparePage() {
   return (
     <div className="space-y-6 max-w-7xl">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight" data-testid="text-html-compare-title">
+        <h1 className="text-2xl md:text-[1.75rem] font-semibold leading-tight" data-testid="text-html-compare-title">
           Сравнение HTML
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="text-[15px] text-muted-foreground mt-2 max-w-prose">
           Структурное сравнение HTML-эталона и лендинга: теги, атрибуты, стили, текст
         </p>
       </div>

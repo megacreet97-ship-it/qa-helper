@@ -33,6 +33,16 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
+if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
+  throw new Error("SESSION_SECRET must be set in production.");
+}
+
+// Behind a reverse proxy (Caddy/nginx) set TRUST_PROXY=1 so req.ip, rate limits
+// and secure cookies see the real client and protocol.
+if (process.env.TRUST_PROXY) {
+  app.set("trust proxy", Number(process.env.TRUST_PROXY) || process.env.TRUST_PROXY);
+}
+
 const PgStore = connectPgSimple(session);
 app.use(
   session({
@@ -43,7 +53,9 @@ app.use(
     cookie: {
       maxAge: 24 * 60 * 60 * 1000,
       httpOnly: true,
-      secure: false,
+      sameSite: "lax",
+      // "auto": Secure flag whenever the request came over HTTPS (needs TRUST_PROXY behind a proxy)
+      secure: "auto",
     },
   }),
 );
@@ -74,8 +86,10 @@ app.use((req, res, next) => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+      // Echo responses contain the caller's headers (cookies, tokens) — never log them
+      if (capturedJsonResponse && !path.startsWith("/api/echo")) {
+        const body = JSON.stringify(capturedJsonResponse);
+        logLine += ` :: ${body.length > 300 ? body.slice(0, 300) + "…" : body}`;
       }
 
       log(logLine);
@@ -114,7 +128,7 @@ app.use((req, res, next) => {
     {
       port,
       host: "0.0.0.0",
-      reusePort: true,
+      reusePort: process.platform === "linux",
     },
     () => {
       log(`serving on port ${port}`);

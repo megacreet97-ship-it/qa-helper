@@ -14,6 +14,8 @@ import {
   type FioComplexity,
 } from "@/lib/generators";
 import { Dices, User, Phone, Mail, Fingerprint, Calendar } from "lucide-react";
+import { usePersistentState } from "@/hooks/use-persistent-state";
+import { useTabParam } from "@/hooks/use-tab-param";
 
 function downloadFile(content: string, filename: string) {
   const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
@@ -26,44 +28,45 @@ function downloadFile(content: string, filename: string) {
 }
 
 export default function PersonalDataPage() {
+  const [tab, setTab] = useTabParam("snils");
   const [snilsResults, setSnilsResults] = useState<string[]>([]);
-  const [snilsValid, setSnilsValid] = useState(true);
-  const [snilsCount, setSnilsCount] = useState(5);
+  const [snilsValid, setSnilsValid] = usePersistentState("personal-data.snilsValid", true);
+  const [snilsCount, setSnilsCount] = usePersistentState("personal-data.snilsCount", 5);
 
   const [fioResults, setFioResults] = useState<string[]>([]);
-  const [fioGender, setFioGender] = useState<"male" | "female" | "random">("random");
-  const [fioCount, setFioCount] = useState(5);
-  const [fioComplexity, setFioComplexity] = useState<FioComplexity>("normal");
+  const [fioGender, setFioGender] = usePersistentState<"male" | "female" | "random">("personal-data.fioGender", "random");
+  const [fioCount, setFioCount] = usePersistentState("personal-data.fioCount", 5);
+  const [fioComplexity, setFioComplexity] = usePersistentState<FioComplexity>("personal-data.fioComplexity", "normal");
 
   const [dateResults, setDateResults] = useState<string[]>([]);
-  const [dateBoundary, setDateBoundary] = useState(false);
-  const [dateCount, setDateCount] = useState(5);
+  const [dateBoundary, setDateBoundary] = usePersistentState("personal-data.dateBoundary", false);
+  const [dateCount, setDateCount] = usePersistentState("personal-data.dateCount", 5);
 
   const [phoneResults, setPhoneResults] = useState<string[]>([]);
-  const [phoneFormat, setPhoneFormat] = useState<"ru" | "international">("ru");
-  const [phoneCount, setPhoneCount] = useState(5);
+  const [phoneFormat, setPhoneFormat] = usePersistentState<"ru" | "international">("personal-data.phoneFormat", "ru");
+  const [phoneCount, setPhoneCount] = usePersistentState("personal-data.phoneCount", 5);
 
   const [emailResults, setEmailResults] = useState<string[]>([]);
-  const [emailValid, setEmailValid] = useState(true);
-  const [emailCount, setEmailCount] = useState(5);
+  const [emailValid, setEmailValid] = usePersistentState("personal-data.emailValid", true);
+  const [emailCount, setEmailCount] = usePersistentState("personal-data.emailCount", 5);
 
   const [idResults, setIdResults] = useState<string[]>([]);
-  const [idType, setIdType] = useState<"uuid" | "random">("uuid");
-  const [idCount, setIdCount] = useState(5);
-  const [idLength, setIdLength] = useState(16);
+  const [idType, setIdType] = usePersistentState<"uuid" | "random">("personal-data.idType", "uuid");
+  const [idCount, setIdCount] = usePersistentState("personal-data.idCount", 5);
+  const [idLength, setIdLength] = usePersistentState("personal-data.idLength", 16);
 
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight" data-testid="text-page-title">
+        <h1 className="text-2xl md:text-[1.75rem] font-semibold leading-tight" data-testid="text-page-title">
           Генераторы персональных данных
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="text-[15px] text-muted-foreground mt-2 max-w-prose">
           Генерация тестовых данных для форм, баз данных и API-тестирования
         </p>
       </div>
 
-      <Tabs defaultValue="snils" className="space-y-4">
+      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <TabsList className="flex flex-wrap h-auto gap-1" data-testid="tabs-personal-data">
           <TabsTrigger value="snils" className="gap-1" data-testid="tab-snils">
             <Fingerprint className="w-3 h-3" /> СНИЛС

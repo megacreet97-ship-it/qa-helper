@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Download, FileText, Dices } from "lucide-react";
+import { usePersistentState } from "@/hooks/use-persistent-state";
 
 function downloadFromApi(url: string, filename: string) {
   const a = document.createElement("a");
@@ -14,13 +15,13 @@ function downloadFromApi(url: string, filename: string) {
 }
 
 export default function FileGeneratorsPage() {
-  const [fileType, setFileType] = useState("txt");
-  const [fileName, setFileName] = useState("тестовый_файл");
+  const [fileType, setFileType] = usePersistentState("file-generators.fileType", "txt");
+  const [fileName, setFileName] = usePersistentState("file-generators.fileName", "тестовый_файл");
   const [fileContent, setFileContent] = useState("Пример тестового содержимого для QA-тестирования.\nСтрока 2: дополнительные данные.");
   const [loading, setLoading] = useState(false);
 
-  const [specialType, setSpecialType] = useState("long_name");
-  const [bigFileSize, setBigFileSize] = useState(1);
+  const [specialType, setSpecialType] = usePersistentState("file-generators.specialType", "long_name");
+  const [bigFileSize, setBigFileSize] = usePersistentState("file-generators.bigFileSize", 1);
 
   const generateFile = async () => {
     setLoading(true);
@@ -68,10 +69,10 @@ export default function FileGeneratorsPage() {
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight" data-testid="text-page-title">
+        <h1 className="text-2xl md:text-[1.75rem] font-semibold leading-tight" data-testid="text-page-title">
           Генераторы файлов
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="text-[15px] text-muted-foreground mt-2 max-w-prose">
           Генерация тестовых файлов различных форматов для тестирования загрузки и обработки
         </p>
       </div>
